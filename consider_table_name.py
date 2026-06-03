@@ -54,9 +54,13 @@ def check_query_type(sql_query):
     cte_flag = False
     subquery_flag = False
     simple_statement = False 
-    dervied_table = False 
+    dervied_table_flag = False 
+    count_cte_start = 0
+    count_subquery_start = 0
+    count_derived_table = 0
     sql_query_list = sql_query.replace(")","").replace("(","").split()
     sql_query_list = [q for q in sql_query_list if q.strip()]
+    before_select_indexes = [i-1 for i,word in enumerate(sql_query_list) if word == "select"]
     print(sql_query_list)
     if sql_query.count("select") > 1:
         print("Multiple select statements detected")
@@ -64,14 +68,11 @@ def check_query_type(sql_query):
         if sql_query.startswith("with"):
             print("CTE detected")
             cte_flag = True
-            ## Detect number of as for cte count 
-            as_indexes = [i+1 for i,word in enumerate(sql_query_list) if word == "as"]
-            count_cte_start = 0
-            print(as_indexes)
+            print(before_select_indexes)
             ## check how many select starts after AS - and consider it as CTE 
-            for x in as_indexes:
+            for x in before_select_indexes:
                 print(sql_query_list[x])
-                if sql_query_list[x] == "select":
+                if sql_query_list[x] == "as":
                     count_cte_start += 1
             ## Case 1.1: It is a multiple CTE 
             if count_cte_start > 1:
@@ -80,11 +81,20 @@ def check_query_type(sql_query):
             ## Case 1.2: It is a single CTE
             else:
                 print("Single CTE detected")
-        ## Case 2: subquery 
-            ## Case 2.1: Subquery after where in |  = | exist 
-            ## Case 2.2: Subquery after having in | = | exist 
+        ## Case 2: subquery Subquery after in |  = | exist 
+        for x in before_select_indexes:
+            subquery_exist_checklist = ["in","=","!=",">=",">","<=","<","exist"]
+            if any(keywords for keywords in subquery_exist_checklist if keywords == sql_query_list[x]):
+                    count_subquery_start += 1
+            if count_subquery_start > 0:
+                 subquery_flag = True
         ## Case 3: Dervied Table 
             ## Case 3.1: exists query after from () as table_alias
+        for x in before_select_indexes:
+            if sql_query_list[x] == "from":
+                    count_derived_table += 1
+            if count_derived_table > 0:
+                 dervied_table_flag = True
     else:
         print("Single Select Detected")
         simple_statement = True
@@ -92,7 +102,9 @@ def check_query_type(sql_query):
             "CTE": cte_flag,
             "count of CTE": count_cte_start,
             "subquery": subquery_flag,
+            "count of subqueries": count_subquery_start,
             "single select": simple_statement,
-            "derived table": dervied_table
+            "derived table": dervied_table_flag,
+            "count of dervied table": count_derived_table
         }
 print(check_query_type(sql_query))
